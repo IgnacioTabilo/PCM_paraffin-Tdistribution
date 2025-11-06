@@ -19,6 +19,7 @@ Date: November 6, 2025
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+from tqdm import tqdm
 
 class PackedBedLHTESModel:
     def __init__(self):
@@ -154,6 +155,13 @@ class PackedBedLHTESModel:
 
         dTdt_htf = np.zeros(self.nz)
         dTdt_pcm = np.zeros(self.nz)
+
+        # Update progress bar if available
+        if hasattr(self, 'pbar') and hasattr(self, 't_final_pbar'):
+            progress = int((t / self.t_final_pbar) * 100)
+            if progress > self.last_progress:
+                self.pbar.update(progress - self.last_progress)
+                self.last_progress = progress
 
         # Update water properties based on average HTF temperature
         T_avg = np.mean(T_htf)
@@ -321,8 +329,19 @@ class PackedBedLHTESModel:
         print(f"Absolute tolerance: 1e-6")
 
         self.t_last = 0
+
+        # Setup progress tracking
+        self.pbar = tqdm(total=100, desc="Running simulation", unit="%", ncols=80)
+        self.t_final_pbar = t_final
+        self.last_progress = 0
+
         sol = solve_ivp(self.heat_transfer_ode, [0, t_final], y0,
                         t_eval=t_eval, method='BDF', rtol=1e-4, atol=1e-6, max_step=10)
+
+        # Close progress bar
+        self.pbar.n = 100
+        self.pbar.refresh()
+        self.pbar.close()
 
         if sol.success:
             print("\n✓ Simulation completed successfully!")
@@ -393,8 +412,11 @@ class PackedBedLHTESModel:
 
         # Plot 2: Liquid Fraction vs Time
         ax2 = axes[0, 1]
+        print("\nCalculating liquid fractions...")
         liquid_fractions = np.array([self.calculate_liquid_fraction(T_pcm_history[:, i])
-                                     for i in range(T_pcm_history.shape[1])]).T
+                                     for i in tqdm(range(T_pcm_history.shape[1]),
+                                                   desc="Liquid fractions",
+                                                   ncols=80)]).T
 
         ax2.plot(t_hours, liquid_fractions[pos_bottom, :], 'b-', label='Bottom', linewidth=2)
         ax2.plot(t_hours, liquid_fractions[pos_middle, :], 'b--', label='Middle', linewidth=1.5)
@@ -427,8 +449,9 @@ class PackedBedLHTESModel:
 
         # Plot 4: Energy Storage vs Time
         ax4 = axes[1, 1]
+        print("\nCalculating energy balance...")
         E_stored = np.zeros(len(t))
-        for i in range(len(t)):
+        for i in tqdm(range(len(t)), desc="Energy calculations", ncols=80):
             E_stored[i] = self.calculate_total_energy(T_htf_history[:, i],
                                                       T_pcm_history[:, i]) - self.E_initial
 
