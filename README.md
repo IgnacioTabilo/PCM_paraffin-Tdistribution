@@ -1,2 +1,2 @@
 # PCM_paraffin-Tdistribution
-OCM and HTF distribution temperature graph.
+PCM and HTF distribution temperature graph.
